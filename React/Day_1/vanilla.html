@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <span>클릭 횟수: 0</span>
+    <button id="btn">Click me</button>
+  </body>
+  <script>
+    let counter = 0;
+    const button = document.getElementById('btn');
+    const handleClick = function() {
+      console.log('i have been clicked')
+      counter += 1;
+      console.log(counter)
+      span.innerText = `클릭 횟수: ${counter}`
+    }
+    button.addEventListener('click', handleClick);
+    const span = document.querySelector('span');
+  </script>
+</html>

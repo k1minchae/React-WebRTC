@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <div id="root"></div>
+  </body>
+  <script
+    crossorigin
+    src="https://unpkg.com/react@18/umd/react.production.min.js"
+  ></script>
+  <script
+    crossorigin
+    src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"
+  ></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel">
+    const root = document.getElementById("root");
+
+    function MinutesToHours() {
+      const [amount, setAmount] = React.useState(0);
+      const [inverted, setInverted] = React.useState(false);
+      const onChange = (event) => {
+        setAmount(event.target.value);
+      };
+      const reset = () => {
+        setAmount(0);
+      };
+      const onFlip = () => {
+        reset();
+        setInverted((current) => !current);
+      };
+      return (
+        <div>
+          <label htmlFor="minutes">Minutes : </label>
+          <input
+            placeholder="Minutes"
+            type="number"
+            id="minutes"
+            value={inverted ? amount * 60 : amount}
+            onChange={onChange}
+            disabled={inverted === true}
+          />
+          <label htmlFor="hours">Hours : </label>
+          <input
+            value={inverted ? amount : Math.round(amount / 60)}
+            placeholder="Hours"
+            type="number"
+            id="hours"
+            disabled={inverted === false}
+            onChange={onChange}
+          />
+          <button onClick={reset}>Reset</button>
+          <button onClick={onFlip}>{inverted ? "되돌리기" : "변환"}</button>
+        </div>
+      );
+    }
+
+    function KmToMiles() {
+      const [amount, setAmount] = React.useState(0);
+      const [inverted, setInverted] = React.useState(false);
+      const onChange = () => {
+        setAmount(event.target.value);
+      };
+      const reset = () => {
+        setAmount(0);
+      };
+      const onFlip = () => {
+        reset();
+        setInverted((current) => !current);
+      };
+      return (
+        <div>
+          <label htmlFor="kilometers">kilometers : </label>
+          <input
+            value={inverted ? (amount * 1.60934).toFixed(4) : amount}
+            id="kilometers"
+            placeholder="킬로미터"
+            type="number"
+            onChange={onChange}
+          />
+          <label htmlFor="miles">miles : </label>
+          <input
+            value={inverted ? amount : (amount * 0.621371).toFixed(4)}
+            id="miles"
+            placeholder="마일"
+            type="number"
+            onChange={onChange}
+          />
+          <button onClick={reset}>리셋</button>
+          <button onClick={onFlip}>{inverted ? "되돌리기" : "전환"}</button>
+        </div>
+      );
+    }
+
+    function App() {
+      const [index, setIndex] = React.useState("0");
+      const onSelect = () => {
+        setIndex(event.target.value);
+      };
+      return (
+        <div>
+          <h1>Super Converter</h1>
+          <select onChange={onSelect}>
+            <option value="0">원하는 변환기를 고르세요.</option>
+            <option value="1">minutes/hours</option>
+            <option value="2">km/miles</option>
+          </select>
+          <hr />
+          {index === "0" ? "please select your converter !" : null}
+
+          {index === "1" ? <MinutesToHours /> : null}
+          {index === "2" ? <KmToMiles /> : null}
+        </div>
+      );
+    }
+    ReactDOM.render(<App />, root);
+  </script>
+</html>
