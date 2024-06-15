@@ -149,4 +149,35 @@ for i in range(n):
         for type in range(len(tetrominoes)):
             result = max(check(i, j, type), result)
 print(result)
+
+
+# 로봇 청소기 14503 : 33분
+import sys
+input = sys.stdin.readline
+n, m = map(int, input().split())
+r, c, d = map(int, input().split())
+arr = [list(map(int, input().split())) for _ in range(n)]
+dir = [(-1, 0), (0, 1), (1, 0), (0, -1)] # 상 동 하 서
+
+result = 0
+def clean(y, x, cd):
+    global result
+    if not arr[y][x]:
+        result += 1
+        arr[y][x] = 2 # 청소 완료 표시
+    for d in range(1, 5):
+        d = d * 3
+        ny = dir[(cd+d) % 4][0] + y
+        nx = dir[(cd+d) % 4][1] + x
+        if not arr[ny][nx]:
+            clean(ny, nx, cd+d)
+            return
+    # 후진
+    ny = y -dir[cd % 4][0]
+    nx = x -dir[cd % 4][1]
+    if arr[ny][nx] != 1:
+        clean(ny, nx, cd)
+    
+clean(r, c, d)
+print(result)
 """
