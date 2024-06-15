@@ -1,6 +1,7 @@
 import PropTypes from "prop-types";
+import { Link } from "react-router-dom";
 
-function Movie({ medium_cover_image, title, genres, rating }) {
+function Movie({ id, medium_cover_image, title, genres, rating }) {
   return (
     <div
       style={{
@@ -16,7 +17,7 @@ function Movie({ medium_cover_image, title, genres, rating }) {
       }}
     >
       <img src={medium_cover_image} alt="img" style={{ width: "100%" }} />
-      <h3>{title}</h3>
+      <Link to={`/movie/${id}`}>{title}</Link>
       <ul style={{ marginRight: "auto" }}>
         {genres.map((g) => (
           <li key={g}>{g}</li>
