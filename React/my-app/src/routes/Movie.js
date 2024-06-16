@@ -1,7 +1,7 @@
 import PropTypes from "prop-types";
 import { Link } from "react-router-dom";
 
-function Movie({ id, medium_cover_image, title, genres, rating }) {
+function Movie({ id, medium_cover_image, title, genres, rating, summary }) {
   return (
     <div
       style={{
@@ -24,6 +24,7 @@ function Movie({ id, medium_cover_image, title, genres, rating }) {
         ))}
       </ul>
       <p style={{ marginRight: "auto" }}>평점 : {rating}</p>
+      {summary.length <= 200 ? summary : `${summary.slice(0, 100)}...`}
     </div>
   );
 }

@@ -33,6 +33,7 @@ function Home() {
                 medium_cover_image={movie.medium_cover_image}
                 rating={movie.rating}
                 genres={movie.genres}
+                summary={movie.summary}
               />
             ))}
       </div>
