@@ -1,8 +1,8 @@
 {
   "files": {
-    "main.js": "/https//k1minchae.github.io/TIL/static/js/main.7ac024d5.js",
-    "index.html": "/https//k1minchae.github.io/TIL/index.html",
-    "main.7ac024d5.js.map": "/https//k1minchae.github.io/TIL/static/js/main.7ac024d5.js.map"
+    "main.js": "/TIL/static/js/main.7ac024d5.js",
+    "index.html": "/TIL/index.html",
+    "main.7ac024d5.js.map": "/TIL/static/js/main.7ac024d5.js.map"
   },
   "entrypoints": [
     "static/js/main.7ac024d5.js"
