@@ -285,3 +285,11 @@ form.addEventListener("submit", onSubmit);
 - array 에 새로운 요소를 추가하려면, 전개구문을 통해 old state 를 불러오고, 그 뒤에 변화분을 덧붙여 새로운 state 를 return
 - state 값이 변했을 때 html 을 repaint 할 수 있도록 paint 함수를 만들어서 subscribe 에 넣는다.
 - filter : element 가 뒤에 test 식을 만족하는경우에만 새로운 array 에 담아서 return 시켜줌
+
+<br>
+<br>
+<hr>
+
+## Redux in React
+
+여태까지는 vanilla JavaScript 에서 redux 를 사용했지만 지금부터는 React Project 에서 Redux 를 사용해보자 !
