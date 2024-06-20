@@ -3,38 +3,68 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { createStore } from "redux";
 
-const add = document.getElementById("add");
-const minus = document.getElementById("minus");
-const number = document.querySelector("span");
+const input = document.querySelector("#input");
+const form = document.querySelector("#form");
+const ul = document.querySelector("ul");
 
-const ADD = "ADD";
-const MINUS = "MINUS";
+const ADD_TODO = "ADD_TODO";
+const DELETE_TODO = "DELETE_TODO";
 
-// 데이터를 변경해주는 함수 : reducer
-const countModifier = (count = 0, action) => {
+const addTodo = (text) => {
+  return { type: ADD_TODO, text, id: Date.now() };
+};
+const dispatchAddTodo = (text) => {
+  todoStore.dispatch(addTodo(text));
+};
+
+const deleteTodo = (id) => {
+  return {
+    type: DELETE_TODO,
+    id,
+  };
+};
+const dispatchDeleteTodo = (event) => {
+  const id = parseInt(event.target.parentNode.id);
+  todoStore.dispatch(deleteTodo(id));
+};
+
+// Reducer
+const todoModifier = (state = [], action) => {
   switch (action.type) {
-    case ADD:
-      return count + 1;
-    case MINUS:
-      return count - 1;
+    case ADD_TODO:
+      return [{ id: action.id, text: action.text }, ...state];
+    case DELETE_TODO:
+      // mutate 하지 않기 위해 splice 가 아닌 filter 를 사용한다.
+      const toDos = state.filter((toDo) => toDo.id !== action.id);
+      return toDos;
     default:
-      return count;
+      return state;
   }
 };
-const countStore = createStore(countModifier);
 
-const onChange = () => {
-  console.log(countStore.getState(), "state 변화");
-  number.innerText = countStore.getState();
+const todoStore = createStore(todoModifier);
+// Todo 목록을 화면에 나타냄
+const paintTodos = () => {
+  const toDos = todoStore.getState();
+  ul.innerHTML = "";
+  toDos.forEach((toDo) => {
+    const li = document.createElement("li");
+    const delBtn = document.createElement("button");
+    delBtn.innerText = "X";
+    li.id = toDo.id;
+    li.innerText = toDo.text;
+    ul.appendChild(li);
+    li.appendChild(delBtn);
+    delBtn.addEventListener("click", dispatchDeleteTodo);
+  });
 };
-countStore.subscribe(onChange);
+todoStore.subscribe(paintTodos);
 
-const handleAdd = () => {
-  countStore.dispatch({ type: ADD });
+// todo를 입력하고 submit 버튼을 눌렀을 때 작동
+const onSubmit = (event) => {
+  event.preventDefault();
+  const toDo = input.value;
+  input.value = "";
+  dispatchAddTodo(toDo);
 };
-const handleMinus = () => {
-  countStore.dispatch({ type: MINUS });
-};
-
-add.addEventListener("click", handleAdd);
-minus.addEventListener("click", handleMinus);
+form.addEventListener("submit", onSubmit);

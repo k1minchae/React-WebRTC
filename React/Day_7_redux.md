@@ -206,3 +206,82 @@ const countModifier = (count = 0, action) => {
 - type 에 String 대신에 변수를 (const ADD = "ADD";) 이런식으로 선언한 뒤
 - type 에 변수를 넣어주면 오타가 났을 때 콘솔에 에러를 볼 수 있다.
 - 디버깅하기 훨씬 쉬워짐!
+
+<br>
+<br>
+
+## State Mutation
+
+```javascript
+const addTodo = (text) => {
+  return { type: ADD_TODO, text, id: Date.now() };
+};
+const dispatchAddTodo = (text) => {
+  todoStore.dispatch(addTodo(text));
+};
+
+const deleteTodo = (id) => {
+  return {
+    type: DELETE_TODO,
+    id,
+  };
+};
+const dispatchDeleteTodo = (event) => {
+  const id = parseInt(event.target.parentNode.id);
+  todoStore.dispatch(deleteTodo(id));
+};
+
+// Reducer
+const todoModifier = (state = [], action) => {
+  switch (action.type) {
+    case ADD_TODO:
+      return [{ id: action.id, text: action.text }, ...state];
+    case DELETE_TODO:
+      // mutate 하지 않기 위해 splice 가 아닌 filter 를 사용한다.
+      const toDos = state.filter((toDo) => toDo.id !== action.id);
+      return toDos;
+    default:
+      return state;
+  }
+};
+
+const todoStore = createStore(todoModifier);
+// Todo 목록을 화면에 나타냄
+const paintTodos = () => {
+  const toDos = todoStore.getState();
+  ul.innerHTML = "";
+  toDos.forEach((toDo) => {
+    const li = document.createElement("li");
+    const delBtn = document.createElement("button");
+    delBtn.innerText = "X";
+    li.id = toDo.id;
+    li.innerText = toDo.text;
+    ul.appendChild(li);
+    li.appendChild(delBtn);
+    delBtn.addEventListener("click", dispatchDeleteTodo);
+  });
+};
+todoStore.subscribe(paintTodos);
+
+// todo를 입력하고 submit 버튼을 눌렀을 때 작동
+const onSubmit = (event) => {
+  event.preventDefault();
+  const toDo = input.value;
+  input.value = "";
+  dispatchAddTodo(toDo);
+};
+form.addEventListener("submit", onSubmit);
+```
+
+- React 에서는 state 를 mutate 하지않고 새로운 state 를 create 해서 return 한다 !
+
+  <span style="color :orange">**이유는 ??**</span>
+
+  1. 불변성 유지 : 상태를 불변하게 유지하면 상태의 변화가 일어날때마다 새로운 객체를 생성해서 변경된 부분을 쉽게 감지할 수 있게 한다.
+  2. 타임 트래블 디버깅 : 상태의 변화 이력 관리 -> 이전 상태로 돌아가거나 상태 변화 시각화
+  3. 변경 추적 및 히스토리 관리
+  4. 버그를 줄인다.
+
+- array 에 새로운 요소를 추가하려면, 전개구문을 통해 old state 를 불러오고, 그 뒤에 변화분을 덧붙여 새로운 state 를 return
+- state 값이 변했을 때 html 을 repaint 할 수 있도록 paint 함수를 만들어서 subscribe 에 넣는다.
+- filter : element 가 뒤에 test 식을 만족하는경우에만 새로운 array 에 담아서 return 시켜줌
