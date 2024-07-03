@@ -25,6 +25,8 @@ for case in all_cases:
         for store in case:
             dist = min(abs(house[0] - store[0]) + abs(house[1] - store[1]), dist)
         all_dist += dist
+        if all_dist >= result:
+            break
     result = min(result, all_dist)
 
 print(result)
