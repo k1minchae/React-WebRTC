@@ -1,7 +1,8 @@
+import Todo from './components/Todo';
 function App() {
   return (
     <div>
-      <h1 className="text-red-500">내 할 일</h1>
+      <Todo />
     </div>
   );
 }
