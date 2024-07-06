@@ -1,14 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { remove } from '../redux/todoSlice';
 
 function TodoList() {
   const [today, setToday] = useState('');
-  const tasks = [
-    'React 문서 읽기',
-    'Tailwind CSS 연습하기',
-    '스터디 과제 완료하기',
-    '알고리즘 문제 풀이',
-    'GitHub에 코드 푸시하기',
-  ];
 
   const currentDate = () => {
     const date = new Date();
@@ -22,20 +17,31 @@ function TodoList() {
     currentDate();
   }, []);
 
+  const todo = useSelector((state) => state.todo);
+  const dispatch = useDispatch();
+  const handleRemove = (e) => {
+    const id = parseInt(e.target.parentNode.id);
+    dispatch(remove(id));
+    console.log(id);
+  };
+
   return (
-    <div className="my-12">
+    <div className="">
       <h1 className="font-['Ownglyph'] text-2xl text-center">{today}</h1>
-      <ul className="my-4 w-[60vh]">
-        {tasks.map((task, index) => (
-          <li key={index} className='font-["Ownglyph"] text-xl flex items-center mt-1'>
+      <ul className="my-4 w-[100%]">
+        {todo.map(({ text, id }) => (
+          <li key={id} id={id} className='font-["Ownglyph"] text-xl flex items-center mt-1'>
             <label className="flex items-center">
               <input
                 type="checkbox"
                 className="form-checkbox h-4 w-4 text-green-500"
                 style={{ accentColor: 'green' }}
               />
-              <span className="ml-2">{task}</span>
+              <span className="ml-2">{text}</span>
             </label>
+            <button className="ml-auto" onClick={handleRemove}>
+              X
+            </button>
           </li>
         ))}
       </ul>
