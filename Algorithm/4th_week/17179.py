@@ -1,3 +1,4 @@
+# 케이크 자르기
 import sys
 input = sys.stdin.readline
 N, M, L = map(int, input().split())
