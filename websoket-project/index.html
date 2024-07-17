@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Multiplayer Canvas Example</title>
+    <style>
+      canvas {
+        border: 1px solid black;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="myCanvas" width="800" height="600"></canvas>
+    <script>
+      const canvas = document.getElementById("myCanvas");
+      const ctx = canvas.getContext("2d");
+
+      // 서버의 로컬 IP 주소로 변경
+      const ws = new WebSocket("ws://localhost:8080");
+
+      let players = {};
+
+      const playerId = Math.random().toString(36).substr(2, 9);
+      players[playerId] = { x: 50, y: 50, size: 50 };
+
+      function drawPlayers() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (const id in players) {
+          const player = players[id];
+          ctx.fillStyle = id === playerId ? "blue" : "red"; // 자신과 다른 플레이어를 구분
+          ctx.fillRect(player.x, player.y, player.size, player.size);
+        }
+      }
+
+      window.addEventListener("keydown", function (event) {
+        const step = 10;
+        switch (event.key) {
+          case "ArrowUp":
+            players[playerId].y -= step;
+            break;
+          case "ArrowDown":
+            players[playerId].y += step;
+            break;
+          case "ArrowLeft":
+            players[playerId].x -= step;
+            break;
+          case "ArrowRight":
+            players[playerId].x += step;
+            break;
+        }
+        drawPlayers();
+        ws.send(JSON.stringify({ id: playerId, position: players[playerId] }));
+      });
+
+      ws.onmessage = function (event) {
+        try {
+          const message = JSON.parse(event.data);
+          players[message.id] = message.position;
+          drawPlayers();
+        } catch (e) {
+          console.error("Error parsing message", e);
+        }
+      };
+
+      ws.onopen = function () {
+        ws.send(JSON.stringify({ id: playerId, position: players[playerId] }));
+      };
+
+      ws.onerror = function (error) {
+        console.error("WebSocket error:", error);
+      };
+
+      drawPlayers();
+    </script>
+  </body>
+</html>
