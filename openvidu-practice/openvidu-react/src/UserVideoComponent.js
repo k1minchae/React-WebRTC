@@ -2,9 +2,16 @@ import React from "react";
 import OpenViduVideoComponent from "./OvVideo";
 import "./UserVideo.css";
 
-export default function UserVideoComponent({ streamManager }) {
+const UserVideoComponent = ({ streamManager }) => {
+  const videoRef = React.useRef();
+
+  React.useEffect(() => {
+    if (streamManager && !!videoRef.current) {
+      streamManager.addVideoElement(videoRef.current);
+    }
+  }, [streamManager]);
+
   const getNicknameTag = () => {
-    // Gets the nickName of the user
     return JSON.parse(streamManager.stream.connection.data).clientData;
   };
 
@@ -12,7 +19,7 @@ export default function UserVideoComponent({ streamManager }) {
     <div>
       {streamManager !== undefined ? (
         <div className="streamcomponent">
-          <OpenViduVideoComponent streamManager={streamManager} />
+          <video autoPlay={true} ref={videoRef} />
           <div>
             <p>{getNicknameTag()}</p>
           </div>
@@ -20,4 +27,6 @@ export default function UserVideoComponent({ streamManager }) {
       ) : null}
     </div>
   );
-}
+};
+
+export default UserVideoComponent;
