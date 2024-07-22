@@ -8,17 +8,17 @@ const APPLICATION_SERVER_URL =
   process.env.NODE_ENV === "production" ? "" : "http://localhost:5000/";
 
 export default function App() {
-  // 상태 변수 선언
   const [mySessionId, setMySessionId] = useState("SessionA");
   const [myUserName, setMyUserName] = useState(
     `Participant${Math.floor(Math.random() * 100)}`
   );
-  const [isCreator, setIsCreator] = useState(false); // 크리에이터 여부 설정
+  const [isCreator, setIsCreator] = useState(false); // 크리에이터인지 여부 설정
   const [session, setSession] = useState(undefined);
   const [mainStreamManager, setMainStreamManager] = useState(undefined);
   const [publisher, setPublisher] = useState(undefined);
   const [subscribers, setSubscribers] = useState([]);
   const [currentVideoDevice, setCurrentVideoDevice] = useState(null);
+  const [visibleSubscribers, setVisibleSubscribers] = useState([]); // 보이는 구독자들
 
   const OV = useRef(new OpenVidu()); // OpenVidu 인스턴스 생성
 
@@ -35,14 +35,11 @@ export default function App() {
   // 메인 비디오 스트림 설정 핸들러
   const handleMainVideoStream = useCallback(
     (stream) => {
-      if (stream !== publisher) {
-        return;
-      }
       if (mainStreamManager !== stream) {
         setMainStreamManager(stream);
       }
     },
-    [mainStreamManager, publisher]
+    [mainStreamManager]
   );
 
   // 세션에 참여하는 함수
@@ -58,12 +55,12 @@ export default function App() {
           event.stream.connection.data
         ).clientData;
 
-        // 팬인 경우 크리에이터의 스트림만 구독
-        if (!isCreator && connectionData !== "creator") {
-          return;
-        }
-
         setSubscribers((subscribers) => [...subscribers, subscriber]);
+
+        // 크리에이터인 경우 모든 구독자를 보이도록 설정
+        if (isCreator) {
+          setVisibleSubscribers((prev) => [...prev, subscriber]);
+        }
       });
 
       // 스트림 종료 시 구독 삭제
@@ -119,7 +116,11 @@ export default function App() {
           setPublisher(publisher);
           setCurrentVideoDevice(currentVideoDevice);
         } catch (error) {
-          console.log("세션 연결시 에러 발생:", error.code, error.message);
+          console.log(
+            "There was an error connecting to the session:",
+            error.code,
+            error.message
+          );
         }
       });
     }
@@ -134,13 +135,14 @@ export default function App() {
     OV.current = new OpenVidu();
     setSession(undefined);
     setSubscribers([]);
+    setVisibleSubscribers([]);
     setMySessionId("SessionA");
     setMyUserName("Participant" + Math.floor(Math.random() * 100));
     setMainStreamManager(undefined);
     setPublisher(undefined);
   }, [session]);
 
-  // 카메라 장치 변경 함수
+  // 카메라 전환 함수
   const switchCamera = useCallback(async () => {
     try {
       const devices = await OV.current.getDevices();
@@ -185,6 +187,16 @@ export default function App() {
         return newSubscribers;
       } else {
         return prevSubscribers;
+      }
+    });
+    setVisibleSubscribers((prevVisibleSubscribers) => {
+      const index = prevVisibleSubscribers.indexOf(streamManager);
+      if (index > -1) {
+        const newVisibleSubscribers = [...prevVisibleSubscribers];
+        newVisibleSubscribers.splice(index, 1);
+        return newVisibleSubscribers;
+      } else {
+        return prevVisibleSubscribers;
       }
     });
   }, []);
@@ -295,7 +307,7 @@ export default function App() {
     [session]
   );
 
-  // 특정 팬의 비디오 제어 함수
+  // 특정 팬의 비디오를 제어하는 함수
   const controlFansVideo = useCallback(
     (subscriber) => {
       if (subscriber && Array.isArray(subscriber.videos)) {
@@ -309,28 +321,77 @@ export default function App() {
     [session]
   );
 
+  // 특정 팬의 비디오를 모든 참가자에게 보이거나 숨기는 함수
+  const toggleFanVisibility = useCallback(
+    (subscriber) => {
+      const subscriberId = subscriber.id;
+      if (visibleSubscribers.includes(subscriber)) {
+        // 이미 보이는 경우 숨김
+        setVisibleSubscribers((prev) =>
+          prev.filter((sub) => sub.id !== subscriberId)
+        );
+      } else {
+        // 보이지 않는 경우 표시
+        setVisibleSubscribers((prev) => [...prev, subscriber]);
+      }
+
+      // 팬의 비디오 상태 변경을 다른 참가자들에게 알림
+      session.signal({
+        data: JSON.stringify({
+          connectionId: subscriber.stream.connection.connectionId,
+          visible: !visibleSubscribers.includes(subscriber),
+        }),
+        to: [], // 모든 참가자에게 전송
+        type: "visibility-toggled",
+      });
+    },
+    [session, visibleSubscribers]
+  );
+
   // 신호를 받은 클라이언트에서 상태를 업데이트하는 함수
-  const updateStateWithSignal = useCallback((event) => {
-    const data = JSON.parse(event.data);
+  const updateStateWithSignal = useCallback(
+    (event) => {
+      const data = JSON.parse(event.data);
 
-    if (event.type === "signal:audio-toggled") {
-      // 해당 connectionId를 가진 참가자의 오디오 상태를 업데이트
-      console.log("오디오 토글 신호 받음: ", data);
-      // 여기서 UI를 업데이트하여 오디오 상태를 반영
-    }
+      if (event.type === "signal:audio-toggled") {
+        // 해당 connectionId를 가진 참가자의 오디오 상태를 업데이트
+        console.log("오디오 토글 신호 받음: ", data);
+        // 여기서 UI를 업데이트하여 오디오 상태를 반영
+      }
 
-    if (event.type === "signal:video-toggled") {
-      // 해당 connectionId를 가진 참가자의 비디오 상태를 업데이트
-      console.log("비디오 토글 신호 받음: ", data);
-      // 여기서 UI를 업데이트하여 비디오 상태를 반영
-    }
-  }, []);
+      if (event.type === "signal:video-toggled") {
+        // 해당 connectionId를 가진 참가자의 비디오 상태를 업데이트
+        console.log("비디오 토글 신호 받음: ", data);
+        // 여기서 UI를 업데이트하여 비디오 상태를 반영
+      }
+
+      if (event.type === "signal:visibility-toggled") {
+        const subscriberId = data.connectionId;
+        const subscriber = subscribers.find(
+          (sub) => sub.stream.connection.connectionId === subscriberId
+        );
+        if (subscriber) {
+          if (data.visible) {
+            setVisibleSubscribers((prev) => [...prev, subscriber]);
+          } else {
+            setVisibleSubscribers((prev) =>
+              prev.filter(
+                (sub) => sub.stream.connection.connectionId !== subscriberId
+              )
+            );
+          }
+        }
+      }
+    },
+    [subscribers]
+  );
 
   // 세션에 신호 이벤트 핸들러 등록
   useEffect(() => {
     if (session) {
       session.on("signal:audio-toggled", updateStateWithSignal);
       session.on("signal:video-toggled", updateStateWithSignal);
+      session.on("signal:visibility-toggled", updateStateWithSignal);
     }
   }, [session, updateStateWithSignal]);
 
@@ -480,9 +541,15 @@ export default function App() {
                     const connectionData = JSON.parse(
                       sub.stream.connection.data
                     ).clientData;
-                    if (connectionData === "creator") {
+                    if (
+                      connectionData === "creator" ||
+                      visibleSubscribers.includes(sub)
+                    ) {
                       return (
-                        <UserVideoComponent key={sub.id} streamManager={sub} />
+                        <div key={sub.id} className="stream-wrapper">
+                          <UserVideoComponent streamManager={sub} />
+                          <span>{connectionData}</span>
+                        </div>
                       );
                     }
                     return null;
@@ -506,20 +573,23 @@ export default function App() {
                     className="stream-container col-md-6 col-xs-6"
                     onClick={() => handleMainVideoStream(sub)}
                   >
-                    <span>
-                      {JSON.parse(sub.stream.connection.data).clientData}
-                    </span>
-                    <UserVideoComponent streamManager={sub} />
-                    {isCreator && (
-                      <>
-                        <button onClick={() => controlFansAudio(sub)}>
-                          Mute/Unmute
-                        </button>
-                        <button onClick={() => controlFansVideo(sub)}>
-                          Enable/Disable Video
-                        </button>
-                      </>
-                    )}
+                    <div className="stream-wrapper">
+                      <UserVideoComponent streamManager={sub} />
+                      <span>
+                        {JSON.parse(sub.stream.connection.data).clientData}
+                      </span>
+                    </div>
+                    <button onClick={() => controlFansAudio(sub)}>
+                      Mute/Unmute
+                    </button>
+                    <button onClick={() => controlFansVideo(sub)}>
+                      Enable/Disable Video
+                    </button>
+                    <button onClick={() => toggleFanVisibility(sub)}>
+                      {visibleSubscribers.includes(sub)
+                        ? "Hide from All"
+                        : "Show to All"}
+                    </button>
                   </div>
                 ))}
               </>
