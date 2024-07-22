@@ -20,6 +20,20 @@ const CORNERS = [
   { name: "소통 코너", description: "팬들과 소통하는 시간입니다." },
   { name: "게임 코너", description: "팬들과 함께 게임을 즐기는 시간입니다." },
   { name: "편지 코너", description: "팬들에게 편지를 읽어주는 시간입니다." },
+  { name: "사연 읽기 코너", description: "사연을 읽어주는 시간입니다." },
+];
+
+const STORIES = [
+  { title: "사연 1", content: "이것은 첫 번째 사연입니다." },
+  { title: "사연 2", content: "이것은 두 번째 사연입니다." },
+  { title: "사연 3", content: "이것은 세 번째 사연입니다." },
+  { title: "사연 4", content: "이것은 네 번째 사연입니다." },
+  { title: "사연 5", content: "이것은 다섯 번째 사연입니다." },
+  { title: "사연 6", content: "이것은 여섯 번째 사연입니다." },
+  { title: "사연 7", content: "이것은 일곱 번째 사연입니다." },
+  { title: "사연 8", content: "이것은 여덟 번째 사연입니다." },
+  { title: "사연 9", content: "이것은 아홉 번째 사연입니다." },
+  { title: "사연 10", content: "이것은 열 번째 사연입니다." },
 ];
 
 export default function App() {
@@ -42,6 +56,8 @@ export default function App() {
   const [userColors, setUserColors] = useState({}); // 사용자 색상 상태
   const [corners, setCorners] = useState(CORNERS); // 코너 정보 상태
   const [currentCorner, setCurrentCorner] = useState(null); // 현재 코너 상태
+  const [stories, setStories] = useState(STORIES); // 사연 상태
+  const [currentStoryIndex, setCurrentStoryIndex] = useState(-1); // 현재 사연 인덱스 상태
 
   const OV = useRef(new OpenVidu()); // OpenVidu 인스턴스 생성
 
@@ -90,6 +106,9 @@ export default function App() {
   const handleChangeCorner = useCallback(
     (corner) => {
       setCurrentCorner(corner);
+      if (corner.name === "사연 읽기 코너") {
+        setCurrentStoryIndex(-1);
+      }
       session.signal({
         data: JSON.stringify(corner),
         to: [], // 모든 참가자에게 전송
@@ -98,6 +117,22 @@ export default function App() {
     },
     [session]
   );
+
+  // 다음 사연으로 넘어가는 함수
+  const handleNextStory = useCallback(() => {
+    setCurrentStoryIndex((prevIndex) => {
+      const nextIndex = prevIndex + 1;
+      if (nextIndex < stories.length) {
+        session.signal({
+          data: JSON.stringify({ nextIndex }),
+          to: [], // 모든 참가자에게 전송
+          type: "story-changed",
+        });
+        return nextIndex;
+      }
+      return prevIndex;
+    });
+  }, [stories, session]);
 
   // 세션에 참여하는 함수
   const joinSession = useCallback(
@@ -144,6 +179,15 @@ export default function App() {
       mySession.on("signal:corner-changed", (event) => {
         const corner = JSON.parse(event.data);
         setCurrentCorner(corner);
+        if (corner.name === "사연 읽기 코너") {
+          setCurrentStoryIndex(-1);
+        }
+      });
+
+      // 사연 변경 수신 핸들러 추가
+      mySession.on("signal:story-changed", (event) => {
+        const { nextIndex } = JSON.parse(event.data);
+        setCurrentStoryIndex(nextIndex);
       });
 
       setSession(mySession);
@@ -225,6 +269,7 @@ export default function App() {
     setNewMessage("");
     setUserColors({});
     setCurrentCorner(null); // 현재 코너 초기화
+    setCurrentStoryIndex(-1); // 현재 사연 인덱스 초기화
   }, [session]);
 
   // 카메라 전환 함수
@@ -498,6 +543,14 @@ export default function App() {
       if (event.type === "signal:corner-changed") {
         const corner = JSON.parse(event.data);
         setCurrentCorner(corner);
+        if (corner.name === "사연 읽기 코너") {
+          setCurrentStoryIndex(-1);
+        }
+      }
+
+      if (event.type === "signal:story-changed") {
+        const { nextIndex } = JSON.parse(event.data);
+        setCurrentStoryIndex(nextIndex);
       }
     },
     [session, subscribers]
@@ -510,6 +563,7 @@ export default function App() {
       session.on("signal:video-toggled", updateStateWithSignal);
       session.on("signal:visibility-toggled", updateStateWithSignal);
       session.on("signal:corner-changed", updateStateWithSignal);
+      session.on("signal:story-changed", updateStateWithSignal);
     }
   }, [session, updateStateWithSignal]);
 
@@ -657,7 +711,39 @@ export default function App() {
             </div>
           )}
 
-          <div id="video-container" className="col-md-12">
+          {currentCorner && currentCorner.name === "사연 읽기 코너" && (
+            <div id="story-container">
+              <h3>사연 읽기 코너</h3>
+              <div id="story-content">
+                {currentStoryIndex === -1 ? (
+                  <p>사연읽기 코너 시작</p>
+                ) : (
+                  <>
+                    <h4>{stories[currentStoryIndex].title}</h4>
+                    <p>{stories[currentStoryIndex].content}</p>
+                  </>
+                )}
+              </div>
+              {isCreator && (
+                <div>
+                  {currentStoryIndex < stories.length - 1 ? (
+                    <button onClick={handleNextStory}>다음 사연</button>
+                  ) : (
+                    <p>사연 끝!</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div
+            id="video-container"
+            className={`col-md-12 ${
+              currentCorner && currentCorner.name === "사연 읽기 코너"
+                ? "reduced-width"
+                : ""
+            }`}
+          >
             {!isCreator && creatorStream && (
               <div className="stream-container col-md-12">
                 <h3>크리에이터 화면</h3>
