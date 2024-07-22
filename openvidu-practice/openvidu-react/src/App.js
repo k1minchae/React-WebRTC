@@ -20,6 +20,8 @@ export default function App() {
   const [currentVideoDevice, setCurrentVideoDevice] = useState(null);
   const [visibleSubscribers, setVisibleSubscribers] = useState([]); // 보이는 구독자들
   const [creatorStream, setCreatorStream] = useState(null); // 크리에이터 스트림
+  const [fanAudioStatus, setFanAudioStatus] = useState({}); // 팬 오디오 상태
+  const [myAudioStatus, setMyAudioStatus] = useState(true); // 내 오디오 상태
 
   const OV = useRef(new OpenVidu()); // OpenVidu 인스턴스 생성
 
@@ -57,6 +59,11 @@ export default function App() {
           setCreatorStream(subscriber);
         }
         setSubscribers((subscribers) => [...subscribers, subscriber]);
+        setFanAudioStatus((prevStatus) => ({
+          ...prevStatus,
+          [subscriber.stream.connection.connectionId]:
+            subscriber.stream.audioActive,
+        }));
       });
 
       // 스트림 종료 시 구독 삭제
@@ -111,6 +118,7 @@ export default function App() {
           setMainStreamManager(publisher);
           setPublisher(publisher);
           setCurrentVideoDevice(currentVideoDevice);
+          setMyAudioStatus(publisher.stream.audioActive);
         } catch (error) {
           console.log(
             "There was an error connecting to the session:",
@@ -137,6 +145,8 @@ export default function App() {
     setMainStreamManager(undefined);
     setPublisher(undefined);
     setCreatorStream(null);
+    setFanAudioStatus({});
+    setMyAudioStatus(true);
   }, [session]);
 
   // 카메라 전환 함수
@@ -166,6 +176,7 @@ export default function App() {
             setCurrentVideoDevice(newVideoDevice[0]);
             setMainStreamManager(newPublisher);
             setPublisher(newPublisher);
+            setMyAudioStatus(newPublisher.stream.audioActive);
           }
         }
       }
@@ -201,9 +212,21 @@ export default function App() {
   // 본인 오디오 토글 함수
   const toggleMyAudio = useCallback(() => {
     if (publisher) {
-      publisher.publishAudio(!publisher.stream.audioActive);
+      const newAudioStatus = !publisher.stream.audioActive;
+      publisher.publishAudio(newAudioStatus);
+      setMyAudioStatus(newAudioStatus);
+
+      // 팬이 자신의 오디오 상태를 변경했을 때 신호를 보냅니다.
+      session.signal({
+        data: JSON.stringify({
+          connectionId: session.connection.connectionId,
+          audio: newAudioStatus,
+        }),
+        to: [], // 모든 참가자에게 전송
+        type: "audio-toggled",
+      });
     }
-  }, [publisher]);
+  }, [publisher, session]);
 
   // 본인 비디오 토글 함수
   const toggleMyVideo = useCallback(() => {
@@ -262,6 +285,11 @@ export default function App() {
         to: [], // 모든 참가자에게 전송
         type: "audio-toggled",
       });
+
+      setFanAudioStatus((prevStatus) => ({
+        ...prevStatus,
+        [subscriber.stream.connection.connectionId]: stateOfAudio,
+      }));
     } else {
       console.log("오디오 트랙이 없습니다 : ", videoObj.id);
     }
@@ -353,7 +381,16 @@ export default function App() {
       if (event.type === "signal:audio-toggled") {
         // 해당 connectionId를 가진 참가자의 오디오 상태를 업데이트
         console.log("오디오 토글 신호 받음: ", data);
-        // 여기서 UI를 업데이트하여 오디오 상태를 반영
+        // 팬의 오디오 상태 업데이트
+        setFanAudioStatus((prevStatus) => ({
+          ...prevStatus,
+          [data.connectionId]: data.audio,
+        }));
+
+        // 만약 이 신호를 받은 팬이라면 자신의 오디오 상태 업데이트
+        if (data.connectionId === session.connection.connectionId) {
+          setMyAudioStatus(data.audio);
+        }
       }
 
       if (event.type === "signal:video-toggled") {
@@ -380,7 +417,7 @@ export default function App() {
         }
       }
     },
-    [subscribers]
+    [session, subscribers]
   );
 
   // 세션에 신호 이벤트 핸들러 등록
@@ -539,12 +576,16 @@ export default function App() {
             <div className="stream-container col-md-12">
               <h3>내 화면</h3>
               <UserVideoComponent streamManager={publisher} />
+              <span>{myAudioStatus ? "마이크 ON" : "마이크 OFF"}</span>
             </div>
             <div className="col-md-12">
               {subscribers.map((sub, i) => {
                 const connectionData = JSON.parse(
                   sub.stream.connection.data
                 ).clientData;
+                const connectionId = sub.stream.connection.connectionId;
+                const isAudioActive = fanAudioStatus[connectionId];
+
                 if (isCreator || visibleSubscribers.includes(sub)) {
                   return (
                     <div
@@ -555,6 +596,9 @@ export default function App() {
                       <div className="stream-wrapper">
                         <UserVideoComponent streamManager={sub} />
                         <span>{connectionData}</span>
+                        <span>
+                          {isAudioActive ? "마이크 ON" : "마이크 OFF"}
+                        </span>
                       </div>
                       {isCreator && (
                         <div>
