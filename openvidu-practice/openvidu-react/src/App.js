@@ -50,13 +50,12 @@ export default function App() {
       // 구독 추가
       mySession.on("streamCreated", (event) => {
         const subscriber = mySession.subscribe(event.stream, undefined);
+        const connectionData = JSON.parse(
+          event.stream.connection.data
+        ).clientData;
 
-        // 팬인 경우 다른 팬의 스트림을 구독하지 않도록 함
-        if (
-          !isCreator &&
-          event.stream.connection.data !==
-            JSON.stringify({ clientData: myUserName })
-        ) {
+        // 팬인 경우 크리에이터의 스트림만 구독하도록 함
+        if (!isCreator && connectionData !== "creator") {
           return;
         }
 
@@ -73,7 +72,7 @@ export default function App() {
 
       setSession(mySession);
     },
-    [isCreator, myUserName]
+    [isCreator]
   );
 
   useEffect(() => {
@@ -81,7 +80,9 @@ export default function App() {
       // Get a token from the OpenVidu deployment
       getToken().then(async (token) => {
         try {
-          await session.connect(token, { clientData: myUserName });
+          await session.connect(token, {
+            clientData: isCreator ? "creator" : myUserName,
+          });
 
           let publisher = await OV.current.initPublisherAsync(undefined, {
             audioSource: undefined,
@@ -120,7 +121,7 @@ export default function App() {
         }
       });
     }
-  }, [session, myUserName, isCreator]);
+  }, [session, isCreator]);
 
   const leaveSession = useCallback(() => {
     // 세션을 떠남
@@ -467,40 +468,59 @@ export default function App() {
             />
           </div>
 
-          {mainStreamManager !== undefined ? (
-            <div id="main-video" className="col-md-6">
-              <UserVideoComponent streamManager={mainStreamManager} />
-            </div>
-          ) : null}
-          <div id="video-container" className="col-md-6">
-            {publisher !== undefined ? (
-              <div
-                className="stream-container col-md-6 col-xs-6"
-                onClick={() => handleMainVideoStream(publisher)}
-              >
-                <UserVideoComponent streamManager={publisher} />
-              </div>
-            ) : null}
-            {subscribers.map((sub, i) => (
-              <div
-                key={sub.id}
-                className="stream-container col-md-6 col-xs-6"
-                onClick={() => handleMainVideoStream(sub)}
-              >
-                <span>{sub.id}</span>
-                <UserVideoComponent streamManager={sub} />
-                {isCreator && (
-                  <>
-                    <button onClick={() => controlFansAudio(sub)}>
-                      Mute/Unmute
-                    </button>
-                    <button onClick={() => controlFansVideo(sub)}>
-                      Enable/Disable Video
-                    </button>
-                  </>
-                )}
-              </div>
-            ))}
+          <div id="video-container" className="col-md-12">
+            {!isCreator && (
+              <>
+                <div className="stream-container col-md-8">
+                  <h2>크리에이터</h2>
+                  {subscribers.map((sub, i) => {
+                    const connectionData = JSON.parse(
+                      sub.stream.connection.data
+                    ).clientData;
+                    if (connectionData === "creator") {
+                      return (
+                        <UserVideoComponent key={sub.id} streamManager={sub} />
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+                <div className="stream-container col-md-4">
+                  <h3>내 화면</h3>
+                  <UserVideoComponent streamManager={publisher} />
+                </div>
+              </>
+            )}
+            {isCreator && (
+              <>
+                <div className="stream-container col-md-6 col-xs-6">
+                  <h3>내 화면</h3>
+                  <UserVideoComponent streamManager={publisher} />
+                </div>
+                {subscribers.map((sub, i) => (
+                  <div
+                    key={sub.id}
+                    className="stream-container col-md-6 col-xs-6"
+                    onClick={() => handleMainVideoStream(sub)}
+                  >
+                    <span>
+                      {JSON.parse(sub.stream.connection.data).clientData}
+                    </span>
+                    <UserVideoComponent streamManager={sub} />
+                    {isCreator && (
+                      <>
+                        <button onClick={() => controlFansAudio(sub)}>
+                          Mute/Unmute
+                        </button>
+                        <button onClick={() => controlFansVideo(sub)}>
+                          Enable/Disable Video
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
       ) : null}
