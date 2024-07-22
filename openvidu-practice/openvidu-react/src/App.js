@@ -10,6 +10,7 @@ import "./App.css";
 const APPLICATION_SERVER_URL =
   process.env.NODE_ENV === "production" ? "" : "http://localhost:5000/";
 
+// 코너 목록 정의
 const CORNERS = [
   { name: "소통 코너", description: "팬들과 소통하는 시간입니다." },
   { name: "게임 코너", description: "팬들과 함께 게임을 즐기는 시간입니다." },
@@ -17,12 +18,14 @@ const CORNERS = [
   { name: "사연 읽기 코너", description: "사연을 읽어주는 시간입니다." },
 ];
 
+// 사연 목록 정의
 const STORIES = [
   { title: "사연 1", content: "이것은 첫 번째 사연입니다." },
   { title: "사연 2", content: "이것은 두 번째 사연입니다." },
   { title: "사연 3", content: "이것은 세 번째 사연입니다." },
 ];
 
+// 랜덤 색상 생성 함수
 const getRandomColor = () => {
   const letters = "0123456789ABCDEF";
   let color = "#";
@@ -33,49 +36,53 @@ const getRandomColor = () => {
 };
 
 export default function App() {
-  const [mySessionId, setMySessionId] = useState("SessionA");
+  const [mySessionId, setMySessionId] = useState("SessionA"); // 세션 ID 상태
   const [myUserName, setMyUserName] = useState(
     `Participant${Math.floor(Math.random() * 100)}`
-  );
-  const [isCreator, setIsCreator] = useState(false);
-  const [session, setSession] = useState(undefined);
-  const [mainStreamManager, setMainStreamManager] = useState(undefined);
-  const [publisher, setPublisher] = useState(undefined);
-  const [subscribers, setSubscribers] = useState([]);
-  const [currentVideoDevice, setCurrentVideoDevice] = useState(null);
-  const [visibleSubscribers, setVisibleSubscribers] = useState([]);
-  const [creatorStream, setCreatorStream] = useState(null);
-  const [fanAudioStatus, setFanAudioStatus] = useState({});
-  const [myAudioStatus, setMyAudioStatus] = useState(true);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [userColors, setUserColors] = useState({});
-  const [corners, setCorners] = useState(CORNERS);
-  const [currentCorner, setCurrentCorner] = useState(null);
-  const [stories, setStories] = useState(STORIES);
-  const [currentStoryIndex, setCurrentStoryIndex] = useState(-1);
+  ); // 사용자 이름 상태
+  const [isCreator, setIsCreator] = useState(false); // 크리에이터 여부 상태
+  const [session, setSession] = useState(undefined); // 세션 상태
+  const [mainStreamManager, setMainStreamManager] = useState(undefined); // 메인 스트림 관리자 상태
+  const [publisher, setPublisher] = useState(undefined); // 퍼블리셔 상태
+  const [subscribers, setSubscribers] = useState([]); // 구독자 상태
+  const [currentVideoDevice, setCurrentVideoDevice] = useState(null); // 현재 비디오 장치 상태
+  const [visibleSubscribers, setVisibleSubscribers] = useState([]); // 보이는 구독자 상태
+  const [creatorStream, setCreatorStream] = useState(null); // 크리에이터 스트림 상태
+  const [fanAudioStatus, setFanAudioStatus] = useState({}); // 팬 오디오 상태
+  const [myAudioStatus, setMyAudioStatus] = useState(true); // 나의 오디오 상태
+  const [chatMessages, setChatMessages] = useState([]); // 채팅 메시지 상태
+  const [newMessage, setNewMessage] = useState(""); // 새로운 메시지 상태
+  const [userColors, setUserColors] = useState({}); // 사용자 색상 상태
+  const [corners, setCorners] = useState(CORNERS); // 코너 목록 상태
+  const [currentCorner, setCurrentCorner] = useState(null); // 현재 코너 상태
+  const [stories, setStories] = useState(STORIES); // 사연 목록 상태
+  const [currentStoryIndex, setCurrentStoryIndex] = useState(-1); // 현재 사연 인덱스 상태
 
-  const OV = useRef(new OpenVidu());
+  const OV = useRef(new OpenVidu()); // OpenVidu 인스턴스 생성
 
+  // 세션 ID 변경 핸들러
   const handleChangeSessionId = useCallback((e) => {
     setMySessionId(e.target.value);
   }, []);
 
+  // 사용자 이름 변경 핸들러
   const handleChangeUserName = useCallback((e) => {
     setMyUserName(e.target.value);
   }, []);
 
+  // 채팅 메시지 변경 핸들러
   const handleChangeMessage = useCallback((e) => {
     setNewMessage(e.target.value);
   }, []);
 
+  // 새로운 채팅 메시지를 보내는 함수
   const handleSendMessage = useCallback(
     (event) => {
       event.preventDefault();
       if (newMessage.trim() !== "") {
         session.signal({
           data: JSON.stringify({ user: myUserName, text: newMessage }),
-          to: [],
+          to: [], // 모든 참가자에게 전송
           type: "chat",
         });
         setNewMessage("");
@@ -84,6 +91,7 @@ export default function App() {
     [session, newMessage, myUserName]
   );
 
+  // 메인 비디오 스트림 설정 핸들러
   const handleMainVideoStream = useCallback(
     (stream) => {
       if (mainStreamManager !== stream) {
@@ -93,6 +101,7 @@ export default function App() {
     [mainStreamManager]
   );
 
+  // 코너 전환 핸들러
   const handleChangeCorner = useCallback(
     (corner) => {
       setCurrentCorner(corner);
@@ -101,20 +110,21 @@ export default function App() {
       }
       session.signal({
         data: JSON.stringify(corner),
-        to: [],
+        to: [], // 모든 참가자에게 전송
         type: "corner-changed",
       });
     },
     [session]
   );
 
+  // 다음 사연으로 넘어가는 함수
   const handleNextStory = useCallback(() => {
     setCurrentStoryIndex((prevIndex) => {
       const nextIndex = prevIndex + 1;
       if (nextIndex < stories.length) {
         session.signal({
           data: JSON.stringify({ nextIndex }),
-          to: [],
+          to: [], // 모든 참가자에게 전송
           type: "story-changed",
         });
         return nextIndex;
@@ -123,11 +133,13 @@ export default function App() {
     });
   }, [stories, session]);
 
+  // 세션에 참여하는 함수
   const joinSession = useCallback(
     (event) => {
       event.preventDefault();
       const mySession = OV.current.initSession();
 
+      // 새로운 스트림이 생성될 때 구독 추가
       mySession.on("streamCreated", (event) => {
         const subscriber = mySession.subscribe(event.stream, undefined);
         const clientData = JSON.parse(event.stream.connection.data).clientData;
@@ -146,19 +158,23 @@ export default function App() {
         }));
       });
 
+      // 스트림이 종료될 때 구독 제거
       mySession.on("streamDestroyed", (event) => {
         deleteSubscriber(event.stream.streamManager);
       });
 
+      // 예외 발생 시 콘솔에 경고 출력
       mySession.on("exception", (exception) => {
         console.warn(exception);
       });
 
+      // 채팅 신호 수신 시 채팅 메시지 업데이트
       mySession.on("signal:chat", (event) => {
         const message = JSON.parse(event.data);
         setChatMessages((prevMessages) => [...prevMessages, message]);
       });
 
+      // 코너 변경 신호 수신 시 현재 코너 업데이트
       mySession.on("signal:corner-changed", (event) => {
         const corner = JSON.parse(event.data);
         setCurrentCorner(corner);
@@ -167,6 +183,7 @@ export default function App() {
         }
       });
 
+      // 사연 변경 신호 수신 시 현재 사연 인덱스 업데이트
       mySession.on("signal:story-changed", (event) => {
         const { nextIndex } = JSON.parse(event.data);
         setCurrentStoryIndex(nextIndex);
@@ -177,6 +194,7 @@ export default function App() {
     [isCreator]
   );
 
+  // 세션이 설정되면 토큰을 가져와서 연결
   useEffect(() => {
     if (session) {
       getToken().then(async (token) => {
@@ -229,6 +247,7 @@ export default function App() {
     }
   }, [session, isCreator, myUserName]);
 
+  // 세션을 떠나는 함수
   const leaveSession = useCallback(() => {
     if (session) {
       session.disconnect();
@@ -252,6 +271,7 @@ export default function App() {
     setCurrentStoryIndex(-1);
   }, [session]);
 
+  // 카메라 전환 함수
   const switchCamera = useCallback(async () => {
     try {
       const devices = await OV.current.getDevices();
@@ -287,6 +307,7 @@ export default function App() {
     }
   }, [currentVideoDevice, session, mainStreamManager, isCreator]);
 
+  // 구독자 삭제 함수
   const deleteSubscriber = useCallback((streamManager) => {
     setSubscribers((prevSubscribers) => {
       const index = prevSubscribers.indexOf(streamManager);
@@ -310,6 +331,7 @@ export default function App() {
     });
   }, []);
 
+  // 본인 오디오 토글 함수
   const toggleMyAudio = useCallback(() => {
     if (publisher) {
       const newAudioStatus = !publisher.stream.audioActive;
@@ -321,30 +343,34 @@ export default function App() {
           connectionId: session.connection.connectionId,
           audio: newAudioStatus,
         }),
-        to: [],
+        to: [], // 모든 참가자에게 전송
         type: "audio-toggled",
       });
     }
   }, [publisher, session]);
 
+  // 본인 비디오 토글 함수
   const toggleMyVideo = useCallback(() => {
     if (publisher) {
       publisher.publishVideo(!publisher.stream.videoActive);
     }
   }, [publisher]);
 
+  // 팬의 오디오 트랙 토글 함수
   const toggleFanAudio = (audioTracks) => {
     const stateOfAudio = !audioTracks[0].enabled;
     audioTracks[0].enabled = stateOfAudio;
     return stateOfAudio;
   };
 
+  // 팬의 비디오 트랙 토글 함수
   const toggleFanVideo = (videoTracks) => {
     const stateOfVideo = !videoTracks[0].enabled;
     videoTracks[0].enabled = stateOfVideo;
     return stateOfVideo;
   };
 
+  // 비디오 요소에서 오디오 트랙을 가져오는 함수
   const getAudioFromVideo = (videoElement) => {
     if (videoElement && videoElement.srcObject) {
       const mediaStream = videoElement.srcObject;
@@ -353,6 +379,7 @@ export default function App() {
     return [];
   };
 
+  // 비디오 요소에서 비디오 트랙을 가져오는 함수
   const getVideoFromVideo = (videoElement) => {
     if (videoElement && videoElement.srcObject) {
       const mediaStream = videoElement.srcObject;
@@ -361,6 +388,7 @@ export default function App() {
     return [];
   };
 
+  // 비디오 객체에서 오디오 트랙을 토글하고 신호를 보내는 함수
   const sendAudioToggleSignal = (videoObj, subscriber, session) => {
     const videoElement = videoObj.video;
     const audioTracks = getAudioFromVideo(videoElement);
@@ -374,7 +402,7 @@ export default function App() {
           connectionId: subscriber.stream.connection.connectionId,
           audio: stateOfAudio,
         }),
-        to: [],
+        to: [], // 모든 참가자에게 전송
         type: "audio-toggled",
       });
 
@@ -387,6 +415,7 @@ export default function App() {
     }
   };
 
+  // 비디오 객체에서 비디오 트랙을 토글하고 신호를 보내는 함수
   const sendVideoToggleSignal = (videoObj, subscriber, session) => {
     const videoElement = videoObj.video;
     const videoTracks = getVideoFromVideo(videoElement);
@@ -400,7 +429,7 @@ export default function App() {
           connectionId: subscriber.stream.connection.connectionId,
           video: stateOfVideo,
         }),
-        to: [],
+        to: [], // 모든 참가자에게 전송
         type: "video-toggled",
       });
     } else {
@@ -408,6 +437,7 @@ export default function App() {
     }
   };
 
+  // 특정 팬의 오디오 제어 함수
   const controlFansAudio = useCallback(
     (subscriber) => {
       if (subscriber && Array.isArray(subscriber.videos)) {
@@ -421,6 +451,7 @@ export default function App() {
     [session]
   );
 
+  // 특정 팬의 비디오를 제어하는 함수
   const controlFansVideo = useCallback(
     (subscriber) => {
       if (subscriber && Array.isArray(subscriber.videos)) {
@@ -434,6 +465,7 @@ export default function App() {
     [session]
   );
 
+  // 특정 팬의 비디오를 모든 참가자에게 보이거나 숨기는 함수
   const toggleFanVisibility = useCallback(
     (subscriber) => {
       const subscriberId = subscriber.id;
@@ -450,13 +482,14 @@ export default function App() {
           connectionId: subscriber.stream.connection.connectionId,
           visible: !visibleSubscribers.includes(subscriber),
         }),
-        to: [],
+        to: [], // 모든 참가자에게 전송
         type: "visibility-toggled",
       });
     },
     [session, visibleSubscribers]
   );
 
+  // 신호를 받은 클라이언트에서 상태를 업데이트하는 함수
   const updateStateWithSignal = useCallback(
     (event) => {
       const data = JSON.parse(event.data);
@@ -511,6 +544,7 @@ export default function App() {
     [session, subscribers]
   );
 
+  // 세션에 신호 이벤트 핸들러 등록
   useEffect(() => {
     if (session) {
       session.on("signal:audio-toggled", updateStateWithSignal);
@@ -521,6 +555,7 @@ export default function App() {
     }
   }, [session, updateStateWithSignal]);
 
+  // 페이지를 떠나기 전 세션을 떠나는 이벤트 핸들러 등록
   useEffect(() => {
     const handleBeforeUnload = (event) => {
       leaveSession();
@@ -532,12 +567,14 @@ export default function App() {
     };
   }, [leaveSession]);
 
+  // 세션 토큰 가져오기
   const getToken = useCallback(async () => {
     return createSession(mySessionId).then((sessionId) =>
       createToken(sessionId)
     );
   }, [mySessionId]);
 
+  // 세션 생성 함수
   const createSession = async (sessionId) => {
     const response = await axios.post(
       APPLICATION_SERVER_URL + "api/sessions",
@@ -549,6 +586,7 @@ export default function App() {
     return response.data;
   };
 
+  // 세션 토큰 생성 함수
   const createToken = async (sessionId) => {
     const response = await axios.post(
       APPLICATION_SERVER_URL + "api/sessions/" + sessionId + "/connections",
