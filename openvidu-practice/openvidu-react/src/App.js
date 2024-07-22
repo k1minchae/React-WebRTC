@@ -7,6 +7,15 @@ import UserVideoComponent from "./UserVideoComponent";
 const APPLICATION_SERVER_URL =
   process.env.NODE_ENV === "production" ? "" : "http://localhost:5000/";
 
+const getRandomColor = () => {
+  const letters = "0123456789ABCDEF";
+  let color = "#";
+  for (let i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)];
+  }
+  return color;
+};
+
 export default function App() {
   const [mySessionId, setMySessionId] = useState("SessionA");
   const [myUserName, setMyUserName] = useState(
@@ -22,6 +31,9 @@ export default function App() {
   const [creatorStream, setCreatorStream] = useState(null); // 크리에이터 스트림
   const [fanAudioStatus, setFanAudioStatus] = useState({}); // 팬 오디오 상태
   const [myAudioStatus, setMyAudioStatus] = useState(true); // 내 오디오 상태
+  const [chatMessages, setChatMessages] = useState([]); // 채팅 메시지 상태
+  const [newMessage, setNewMessage] = useState(""); // 새로운 메시지 입력 상태
+  const [userColors, setUserColors] = useState({}); // 사용자 색상 상태
 
   const OV = useRef(new OpenVidu()); // OpenVidu 인스턴스 생성
 
@@ -34,6 +46,27 @@ export default function App() {
   const handleChangeUserName = useCallback((e) => {
     setMyUserName(e.target.value);
   }, []);
+
+  // 채팅 메시지 변경 핸들러
+  const handleChangeMessage = useCallback((e) => {
+    setNewMessage(e.target.value);
+  }, []);
+
+  // 새로운 채팅 메시지를 보내는 함수
+  const handleSendMessage = useCallback(
+    (event) => {
+      event.preventDefault();
+      if (newMessage.trim() !== "") {
+        session.signal({
+          data: JSON.stringify({ user: myUserName, text: newMessage }),
+          to: [], // 모든 참가자에게 전송
+          type: "chat",
+        });
+        setNewMessage("");
+      }
+    },
+    [session, newMessage, myUserName]
+  );
 
   // 메인 비디오 스트림 설정 핸들러
   const handleMainVideoStream = useCallback(
@@ -64,6 +97,10 @@ export default function App() {
           [subscriber.stream.connection.connectionId]:
             subscriber.stream.audioActive,
         }));
+        setUserColors((prevColors) => ({
+          ...prevColors,
+          [clientData]: getRandomColor(),
+        }));
       });
 
       // 스트림 종료 시 구독 삭제
@@ -74,6 +111,12 @@ export default function App() {
       // 예외 발생 시 경고 로그 출력
       mySession.on("exception", (exception) => {
         console.warn(exception);
+      });
+
+      // 채팅 메시지 수신 핸들러 추가
+      mySession.on("signal:chat", (event) => {
+        const message = JSON.parse(event.data);
+        setChatMessages((prevMessages) => [...prevMessages, message]);
       });
 
       setSession(mySession);
@@ -119,6 +162,10 @@ export default function App() {
           setPublisher(publisher);
           setCurrentVideoDevice(currentVideoDevice);
           setMyAudioStatus(publisher.stream.audioActive);
+          setUserColors((prevColors) => ({
+            ...prevColors,
+            [myUserName]: getRandomColor(),
+          }));
         } catch (error) {
           console.log(
             "There was an error connecting to the session:",
@@ -128,7 +175,7 @@ export default function App() {
         }
       });
     }
-  }, [session, isCreator]);
+  }, [session, isCreator, myUserName]);
 
   // 세션을 떠나는 함수
   const leaveSession = useCallback(() => {
@@ -147,6 +194,9 @@ export default function App() {
     setCreatorStream(null);
     setFanAudioStatus({});
     setMyAudioStatus(true);
+    setChatMessages([]); // 채팅 메시지 초기화
+    setNewMessage("");
+    setUserColors({});
   }, [session]);
 
   // 카메라 전환 함수
@@ -621,6 +671,30 @@ export default function App() {
                 return null;
               })}
             </div>
+          </div>
+
+          <div id="chat-container" className="col-md-12">
+            <h3>채팅</h3>
+            <div id="chat-box">
+              {chatMessages.map((msg, i) => (
+                <div
+                  key={i}
+                  className="chat-message"
+                  style={{ color: userColors[msg.user] }}
+                >
+                  <strong>{msg.user}:</strong> {msg.text}
+                </div>
+              ))}
+            </div>
+            <form onSubmit={handleSendMessage}>
+              <input
+                type="text"
+                value={newMessage}
+                onChange={handleChangeMessage}
+                placeholder="메시지를 입력하세요"
+              />
+              <button type="submit">전송</button>
+            </form>
           </div>
         </div>
       ) : null}
