@@ -12,6 +12,7 @@ export default function App() {
   const [myUserName, setMyUserName] = useState(
     `Participant${Math.floor(Math.random() * 100)}`
   );
+  const [isCreator, setIsCreator] = useState(false); // 크리에이터인지 여부를 설정
   const [session, setSession] = useState(undefined);
   const [mainStreamManager, setMainStreamManager] = useState(undefined);
   const [publisher, setPublisher] = useState(undefined);
@@ -41,26 +42,39 @@ export default function App() {
     [mainStreamManager, publisher]
   );
 
-  const joinSession = useCallback((event) => {
-    event.preventDefault(); // 폼 제출 이벤트의 기본 동작을 막음
-    const mySession = OV.current.initSession();
+  const joinSession = useCallback(
+    (event) => {
+      event.preventDefault(); // 폼 제출 이벤트의 기본 동작을 막음
+      const mySession = OV.current.initSession();
 
-    // 구독 추가
-    mySession.on("streamCreated", (event) => {
-      const subscriber = mySession.subscribe(event.stream, undefined);
-      setSubscribers((subscribers) => [...subscribers, subscriber]);
-    });
+      // 구독 추가
+      mySession.on("streamCreated", (event) => {
+        const subscriber = mySession.subscribe(event.stream, undefined);
 
-    mySession.on("streamDestroyed", (event) => {
-      deleteSubscriber(event.stream.streamManager);
-    });
+        // 팬인 경우 다른 팬의 스트림을 구독하지 않도록 함
+        if (
+          !isCreator &&
+          event.stream.connection.data !==
+            JSON.stringify({ clientData: myUserName })
+        ) {
+          return;
+        }
 
-    mySession.on("exception", (exception) => {
-      console.warn(exception);
-    });
+        setSubscribers((subscribers) => [...subscribers, subscriber]);
+      });
 
-    setSession(mySession);
-  }, []);
+      mySession.on("streamDestroyed", (event) => {
+        deleteSubscriber(event.stream.streamManager);
+      });
+
+      mySession.on("exception", (exception) => {
+        console.warn(exception);
+      });
+
+      setSession(mySession);
+    },
+    [isCreator, myUserName]
+  );
 
   useEffect(() => {
     if (session) {
@@ -72,7 +86,7 @@ export default function App() {
           let publisher = await OV.current.initPublisherAsync(undefined, {
             audioSource: undefined,
             videoSource: undefined,
-            publishAudio: true,
+            publishAudio: isCreator, // 크리에이터면 오디오 활성화, 팬이면 비활성화
             publishVideo: true,
             resolution: "640x480",
             frameRate: 30,
@@ -106,15 +120,15 @@ export default function App() {
         }
       });
     }
-  }, [session, myUserName]);
+  }, [session, myUserName, isCreator]);
 
   const leaveSession = useCallback(() => {
-    // Leave the session
+    // 세션을 떠남
     if (session) {
       session.disconnect();
     }
 
-    // Reset all states and OpenVidu object
+    // 모든 상태와 OpenVidu 객체를 초기화
     OV.current = new OpenVidu();
     setSession(undefined);
     setSubscribers([]);
@@ -139,7 +153,7 @@ export default function App() {
         if (newVideoDevice.length > 0) {
           const newPublisher = OV.current.initPublisher(undefined, {
             videoSource: newVideoDevice[0].deviceId,
-            publishAudio: true,
+            publishAudio: isCreator, // 크리에이터는 오디오 활성화, 팬은 비활성화
             publishVideo: true,
             mirror: true,
           });
@@ -156,7 +170,7 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-  }, [currentVideoDevice, session, mainStreamManager]);
+  }, [currentVideoDevice, session, mainStreamManager, isCreator]);
 
   const deleteSubscriber = useCallback((streamManager) => {
     setSubscribers((prevSubscribers) => {
@@ -394,6 +408,14 @@ export default function App() {
                   required
                 />
               </p>
+              <p>
+                <label> Are you the creator? </label>
+                <input
+                  type="checkbox"
+                  checked={isCreator}
+                  onChange={() => setIsCreator(!isCreator)}
+                />
+              </p>
               <p className="text-center">
                 <input
                   className="btn btn-lg btn-success"
@@ -418,20 +440,24 @@ export default function App() {
               onClick={leaveSession}
               value="Leave session"
             />
-            <input
-              className="btn btn-large btn-success"
-              type="button"
-              id="buttonSwitchCamera"
-              onClick={switchCamera}
-              value="Switch Camera"
-            />
-            <input
-              className="btn btn-large btn-warning"
-              type="button"
-              id="buttonToggleAudio"
-              onClick={toggleMyAudio}
-              value="Toggle Audio"
-            />
+            {isCreator && (
+              <input
+                className="btn btn-large btn-success"
+                type="button"
+                id="buttonSwitchCamera"
+                onClick={switchCamera}
+                value="Switch Camera"
+              />
+            )}
+            {isCreator && (
+              <input
+                className="btn btn-large btn-warning"
+                type="button"
+                id="buttonToggleAudio"
+                onClick={toggleMyAudio}
+                value="Toggle Audio"
+              />
+            )}
             <input
               className="btn btn-large btn-warning"
               type="button"
@@ -463,12 +489,16 @@ export default function App() {
               >
                 <span>{sub.id}</span>
                 <UserVideoComponent streamManager={sub} />
-                <button onClick={() => controlFansAudio(sub)}>
-                  Mute/Unmute
-                </button>
-                <button onClick={() => controlFansVideo(sub)}>
-                  Enable/Disable Video
-                </button>
+                {isCreator && (
+                  <>
+                    <button onClick={() => controlFansAudio(sub)}>
+                      Mute/Unmute
+                    </button>
+                    <button onClick={() => controlFansVideo(sub)}>
+                      Enable/Disable Video
+                    </button>
+                  </>
+                )}
               </div>
             ))}
           </div>
