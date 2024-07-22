@@ -45,6 +45,7 @@ export default function App() {
     event.preventDefault(); // 폼 제출 이벤트의 기본 동작을 막음
     const mySession = OV.current.initSession();
 
+    // 구독 추가
     mySession.on("streamCreated", (event) => {
       const subscriber = mySession.subscribe(event.stream, undefined);
       setSubscribers((subscribers) => [...subscribers, subscriber]);
@@ -170,99 +171,154 @@ export default function App() {
     });
   }, []);
 
-  const toggleAudio = useCallback(() => {
+  // 본인 오디오 트랙 토글
+  const toggleMyAudio = useCallback(() => {
     if (publisher) {
       publisher.publishAudio(!publisher.stream.audioActive);
     }
   }, [publisher]);
 
-  const toggleVideo = useCallback(() => {
+  // 본인 비디오 트랙 토글
+  const toggleMyVideo = useCallback(() => {
     if (publisher) {
       publisher.publishVideo(!publisher.stream.videoActive);
     }
   }, [publisher]);
 
-  // 다른 사람의 오디오 제어
-  const muteUnmuteSubscriber = useCallback(
-    (subscriber) => {
-      if (subscriber && Array.isArray(subscriber.videos)) {
-        console.log("Subscriber object:", subscriber);
-        subscriber.videos.forEach((videoObj) => {
-          const videoElement = videoObj.video;
-          if (videoElement && videoElement.srcObject) {
-            const mediaStream = videoElement.srcObject;
-            const audioTracks = mediaStream.getAudioTracks();
-            if (audioTracks.length > 0) {
-              const newEnabledState = !audioTracks[0].enabled;
-              audioTracks[0].enabled = newEnabledState;
-              console.log("Audio track toggled for", videoObj.id);
+  // 팬의 오디오 트랙 토글
+  const toggleFanAudio = (audioTracks) => {
+    const stateOfAudio = !audioTracks[0].enabled;
+    audioTracks[0].enabled = stateOfAudio;
+    return stateOfAudio;
+  };
 
-              // Send signal to inform others about the audio state change
-              session.signal({
-                data: JSON.stringify({
-                  connectionId: subscriber.stream.connection.connectionId,
-                  audio: newEnabledState,
-                }),
-                to: [], // Send to all participants
-                type: "audio-toggled",
-              });
-            } else {
-              console.log("No audio tracks found for", videoObj.id);
-            }
-          } else {
-            console.log(
-              "Video element or srcObject is undefined for",
-              videoObj.id
-            );
-          }
+  // 팬의 비디오 트랙 토글
+  const toggleFanVideo = (videoTracks) => {
+    const stateOfVideo = !videoTracks[0].enabled;
+    videoTracks[0].enabled = stateOfVideo;
+    return stateOfVideo;
+  };
+
+  // 비디오 요소에서 오디오 트랙을 가져오는 함수
+  const getAudioFromVideo = (videoElement) => {
+    if (videoElement && videoElement.srcObject) {
+      const mediaStream = videoElement.srcObject;
+      return mediaStream.getAudioTracks();
+    }
+    return [];
+  };
+
+  // 비디오 요소에서 비디오 트랙을 가져오는 함수
+  const getVideoFromVideo = (videoElement) => {
+    if (videoElement && videoElement.srcObject) {
+      const mediaStream = videoElement.srcObject;
+      return mediaStream.getVideoTracks();
+    }
+    return [];
+  };
+
+  // 비디오 객체에서 오디오 트랙을 토글하고 신호를 보내는 함수
+  const sendAudioToggleSignal = (videoObj, subscriber, session) => {
+    const videoElement = videoObj.video;
+    const audioTracks = getAudioFromVideo(videoElement);
+
+    if (audioTracks.length > 0) {
+      const stateOfAudio = toggleFanAudio(audioTracks);
+      console.log("제어한 팬의 오디오 트랙 : ", videoObj.id);
+
+      // 오디오 상태 변경을 다른 참가자들에게 알리기 위해 신호를 보냄
+      session.signal({
+        data: JSON.stringify({
+          connectionId: subscriber.stream.connection.connectionId,
+          audio: stateOfAudio,
+        }),
+        to: [], // 모든 참가자에게 전송
+        type: "audio-toggled",
+      });
+    } else {
+      console.log("오디오 트랙이 없습니다 : ", videoObj.id);
+    }
+  };
+
+  // 비디오 객체에서 비디오 트랙을 토글하고 신호를 보내는 함수
+  const sendVideoToggleSignal = (videoObj, subscriber, session) => {
+    const videoElement = videoObj.video;
+    const videoTracks = getVideoFromVideo(videoElement);
+
+    if (videoTracks.length > 0) {
+      const stateOfVideo = toggleFanVideo(videoTracks);
+      console.log("비디오 트랙 토글됨: ", videoObj.id);
+
+      // 비디오 상태 변경을 다른 참가자들에게 알리기 위해 신호를 보냄
+      session.signal({
+        data: JSON.stringify({
+          connectionId: subscriber.stream.connection.connectionId,
+          video: stateOfVideo,
+        }),
+        to: [], // 모두에게 신호 전송
+        type: "video-toggled", // 신호 타입을 'video-toggled'로 설정
+      });
+    } else {
+      console.log("비디오 트랙이 없습니다: ", videoObj.id);
+    }
+  };
+
+  // 특정 팬의 오디오 제어
+  const controlFansAudio = useCallback(
+    (subscriber) => {
+      // 참여자 존재 + 그 안에 비디오 속성이 배열인 경우만 실행
+      if (subscriber && Array.isArray(subscriber.videos)) {
+        // 각 비디오에 대해 반복문 실행
+        subscriber.videos.forEach((videoObj) => {
+          sendAudioToggleSignal(videoObj, subscriber, session);
         });
       } else {
-        console.log("Subscriber or videos array is undefined");
+        console.log("참여자나 비디오 배열이 없습니다.");
       }
     },
     [session]
   );
 
-  // 다른 사람의 비디오 제어
-  const enableDisableSubscriberVideo = useCallback(
+  // 특정 팬의 비디오를 제어하는 함수
+  const controlFansVideo = useCallback(
     (subscriber) => {
+      // subscriber가 존재하고 비디오 속성이 배열인 경우만 실행
       if (subscriber && Array.isArray(subscriber.videos)) {
-        console.log("Subscriber object:", subscriber);
+        // 각 비디오에 대해 반복문 실행
         subscriber.videos.forEach((videoObj) => {
-          const videoElement = videoObj.video;
-          if (videoElement && videoElement.srcObject) {
-            const mediaStream = videoElement.srcObject;
-            const videoTracks = mediaStream.getVideoTracks();
-            if (videoTracks.length > 0) {
-              const newEnabledState = !videoTracks[0].enabled;
-              videoTracks[0].enabled = newEnabledState;
-              console.log("Video track toggled for", videoObj.id);
-
-              // Send signal to inform others about the video state change
-              session.signal({
-                data: JSON.stringify({
-                  connectionId: subscriber.stream.connection.connectionId,
-                  video: newEnabledState,
-                }),
-                to: [], // Send to all participants
-                type: "video-toggled",
-              });
-            } else {
-              console.log("No video tracks found for", videoObj.id);
-            }
-          } else {
-            console.log(
-              "Video element or srcObject is undefined for",
-              videoObj.id
-            );
-          }
+          sendVideoToggleSignal(videoObj, subscriber, session);
         });
       } else {
-        console.log("Subscriber or videos array is undefined");
+        console.log("subscriber 객체나 videos 배열이 정의되지 않았습니다.");
       }
     },
     [session]
   );
+
+  // 신호를 받은 클라이언트에서 상태를 업데이트하는 함수
+  const updateStateWithSignal = useCallback((event) => {
+    const data = JSON.parse(event.data);
+
+    if (event.type === "signal:audio-toggled") {
+      // 해당 connectionId를 가진 참가자의 오디오 상태를 업데이트
+      console.log("오디오 토글 신호 받음: ", data);
+      // 여기서 UI를 업데이트하여 오디오 상태를 반영
+    }
+
+    if (event.type === "signal:video-toggled") {
+      // 해당 connectionId를 가진 참가자의 비디오 상태를 업데이트
+      console.log("비디오 토글 신호 받음: ", data);
+      // 여기서 UI를 업데이트하여 비디오 상태를 반영
+    }
+  }, []);
+
+  // 세션에 신호 이벤트 핸들러 등록
+  useEffect(() => {
+    if (session) {
+      session.on("signal:audio-toggled", updateStateWithSignal);
+      session.on("signal:video-toggled", updateStateWithSignal);
+    }
+  }, [session, updateStateWithSignal]);
 
   useEffect(() => {
     const handleBeforeUnload = (event) => {
@@ -275,21 +331,6 @@ export default function App() {
     };
   }, [leaveSession]);
 
-  /**
-   * --------------------------------------------
-   * GETTING A TOKEN FROM YOUR APPLICATION SERVER
-   * --------------------------------------------
-   * The methods below request the creation of a Session and a Token to
-   * your application server. This keeps your OpenVidu deployment secure.
-   *
-   * In this sample code, there is no user control at all. Anybody could
-   * access your application server endpoints! In a real production
-   * environment, your application server must identify the user to allow
-   * access to the endpoints.
-   *
-   * Visit https://docs.openvidu.io/en/stable/application-server to learn
-   * more about the integration of OpenVidu in your application server.
-   */
   const getToken = useCallback(async () => {
     return createSession(mySessionId).then((sessionId) =>
       createToken(sessionId)
@@ -315,7 +356,7 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
       }
     );
-    return response.data; // The token
+    return response.data;
   };
 
   return (
@@ -388,14 +429,14 @@ export default function App() {
               className="btn btn-large btn-warning"
               type="button"
               id="buttonToggleAudio"
-              onClick={toggleAudio}
+              onClick={toggleMyAudio}
               value="Toggle Audio"
             />
             <input
               className="btn btn-large btn-warning"
               type="button"
               id="buttonToggleVideo"
-              onClick={toggleVideo}
+              onClick={toggleMyVideo}
               value="Toggle Video"
             />
           </div>
@@ -422,10 +463,10 @@ export default function App() {
               >
                 <span>{sub.id}</span>
                 <UserVideoComponent streamManager={sub} />
-                <button onClick={() => muteUnmuteSubscriber(sub)}>
+                <button onClick={() => controlFansAudio(sub)}>
                   Mute/Unmute
                 </button>
-                <button onClick={() => enableDisableSubscriberVideo(sub)}>
+                <button onClick={() => controlFansVideo(sub)}>
                   Enable/Disable Video
                 </button>
               </div>
