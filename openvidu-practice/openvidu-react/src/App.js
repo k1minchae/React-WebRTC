@@ -19,6 +19,7 @@ export default function App() {
   const [subscribers, setSubscribers] = useState([]);
   const [currentVideoDevice, setCurrentVideoDevice] = useState(null);
   const [visibleSubscribers, setVisibleSubscribers] = useState([]); // 보이는 구독자들
+  const [creatorStream, setCreatorStream] = useState(null); // 크리에이터 스트림
 
   const OV = useRef(new OpenVidu()); // OpenVidu 인스턴스 생성
 
@@ -51,6 +52,10 @@ export default function App() {
       // 스트림 생성 시 구독 추가
       mySession.on("streamCreated", (event) => {
         const subscriber = mySession.subscribe(event.stream, undefined);
+        const clientData = JSON.parse(event.stream.connection.data).clientData;
+        if (clientData === "creator") {
+          setCreatorStream(subscriber);
+        }
         setSubscribers((subscribers) => [...subscribers, subscriber]);
       });
 
@@ -131,6 +136,7 @@ export default function App() {
     setMyUserName("Participant" + Math.floor(Math.random() * 100));
     setMainStreamManager(undefined);
     setPublisher(undefined);
+    setCreatorStream(null);
   }, [session]);
 
   // 카메라 전환 함수
@@ -524,16 +530,16 @@ export default function App() {
           </div>
 
           <div id="video-container" className="col-md-12">
-            <div className="stream-container col-md-12">
-              <h2>크리에이터</h2>
-              <UserVideoComponent streamManager={publisher} />
-            </div>
-            {!isCreator && (
+            {!isCreator && creatorStream && (
               <div className="stream-container col-md-12">
-                <h3>내 화면</h3>
-                <UserVideoComponent streamManager={publisher} />
+                <h3>크리에이터 화면</h3>
+                <UserVideoComponent streamManager={creatorStream} />
               </div>
             )}
+            <div className="stream-container col-md-12">
+              <h3>내 화면</h3>
+              <UserVideoComponent streamManager={publisher} />
+            </div>
             <div className="col-md-12">
               {subscribers.map((sub, i) => {
                 const connectionData = JSON.parse(
