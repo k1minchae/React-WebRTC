@@ -16,6 +16,12 @@ const getRandomColor = () => {
   return color;
 };
 
+const CORNERS = [
+  { name: "소통 코너", description: "팬들과 소통하는 시간입니다." },
+  { name: "게임 코너", description: "팬들과 함께 게임을 즐기는 시간입니다." },
+  { name: "편지 코너", description: "팬들에게 편지를 읽어주는 시간입니다." },
+];
+
 export default function App() {
   const [mySessionId, setMySessionId] = useState("SessionA");
   const [myUserName, setMyUserName] = useState(
@@ -34,6 +40,8 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState([]); // 채팅 메시지 상태
   const [newMessage, setNewMessage] = useState(""); // 새로운 메시지 입력 상태
   const [userColors, setUserColors] = useState({}); // 사용자 색상 상태
+  const [corners, setCorners] = useState(CORNERS); // 코너 정보 상태
+  const [currentCorner, setCurrentCorner] = useState(null); // 현재 코너 상태
 
   const OV = useRef(new OpenVidu()); // OpenVidu 인스턴스 생성
 
@@ -78,6 +86,19 @@ export default function App() {
     [mainStreamManager]
   );
 
+  // 코너 전환 핸들러
+  const handleChangeCorner = useCallback(
+    (corner) => {
+      setCurrentCorner(corner);
+      session.signal({
+        data: JSON.stringify(corner),
+        to: [], // 모든 참가자에게 전송
+        type: "corner-changed",
+      });
+    },
+    [session]
+  );
+
   // 세션에 참여하는 함수
   const joinSession = useCallback(
     (event) => {
@@ -117,6 +138,12 @@ export default function App() {
       mySession.on("signal:chat", (event) => {
         const message = JSON.parse(event.data);
         setChatMessages((prevMessages) => [...prevMessages, message]);
+      });
+
+      // 코너 전환 수신 핸들러 추가
+      mySession.on("signal:corner-changed", (event) => {
+        const corner = JSON.parse(event.data);
+        setCurrentCorner(corner);
       });
 
       setSession(mySession);
@@ -197,6 +224,7 @@ export default function App() {
     setChatMessages([]); // 채팅 메시지 초기화
     setNewMessage("");
     setUserColors({});
+    setCurrentCorner(null); // 현재 코너 초기화
   }, [session]);
 
   // 카메라 전환 함수
@@ -466,6 +494,11 @@ export default function App() {
           }
         }
       }
+
+      if (event.type === "signal:corner-changed") {
+        const corner = JSON.parse(event.data);
+        setCurrentCorner(corner);
+      }
     },
     [session, subscribers]
   );
@@ -476,6 +509,7 @@ export default function App() {
       session.on("signal:audio-toggled", updateStateWithSignal);
       session.on("signal:video-toggled", updateStateWithSignal);
       session.on("signal:visibility-toggled", updateStateWithSignal);
+      session.on("signal:corner-changed", updateStateWithSignal);
     }
   }, [session, updateStateWithSignal]);
 
@@ -616,6 +650,13 @@ export default function App() {
             />
           </div>
 
+          {currentCorner && (
+            <div id="corner-info">
+              <h2>현재 코너: {currentCorner.name}</h2>
+              <p>{currentCorner.description}</p>
+            </div>
+          )}
+
           <div id="video-container" className="col-md-12">
             {!isCreator && creatorStream && (
               <div className="stream-container col-md-12">
@@ -696,6 +737,17 @@ export default function App() {
               <button type="submit">전송</button>
             </form>
           </div>
+
+          {isCreator && (
+            <div id="corner-container" className="col-md-12">
+              <h3>코너 전환</h3>
+              {corners.map((corner, index) => (
+                <button key={index} onClick={() => handleChangeCorner(corner)}>
+                  {corner.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       ) : null}
     </div>
