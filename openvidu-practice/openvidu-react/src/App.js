@@ -8,30 +8,33 @@ const APPLICATION_SERVER_URL =
   process.env.NODE_ENV === "production" ? "" : "http://localhost:5000/";
 
 export default function App() {
+  // 상태 변수 선언
   const [mySessionId, setMySessionId] = useState("SessionA");
   const [myUserName, setMyUserName] = useState(
     `Participant${Math.floor(Math.random() * 100)}`
   );
-  const [isCreator, setIsCreator] = useState(false); // 크리에이터인지 여부를 설정
+  const [isCreator, setIsCreator] = useState(false); // 크리에이터 여부 설정
   const [session, setSession] = useState(undefined);
   const [mainStreamManager, setMainStreamManager] = useState(undefined);
   const [publisher, setPublisher] = useState(undefined);
   const [subscribers, setSubscribers] = useState([]);
   const [currentVideoDevice, setCurrentVideoDevice] = useState(null);
 
-  const OV = useRef(new OpenVidu());
+  const OV = useRef(new OpenVidu()); // OpenVidu 인스턴스 생성
 
+  // 세션 ID 변경 핸들러
   const handleChangeSessionId = useCallback((e) => {
     setMySessionId(e.target.value);
   }, []);
 
+  // 사용자 이름 변경 핸들러
   const handleChangeUserName = useCallback((e) => {
     setMyUserName(e.target.value);
   }, []);
 
+  // 메인 비디오 스트림 설정 핸들러
   const handleMainVideoStream = useCallback(
     (stream) => {
-      // 본인의 비디오만 Main 공간에 나오도록
       if (stream !== publisher) {
         return;
       }
@@ -42,19 +45,20 @@ export default function App() {
     [mainStreamManager, publisher]
   );
 
+  // 세션에 참여하는 함수
   const joinSession = useCallback(
     (event) => {
-      event.preventDefault(); // 폼 제출 이벤트의 기본 동작을 막음
+      event.preventDefault(); // 폼 제출 기본 동작 방지
       const mySession = OV.current.initSession();
 
-      // 구독 추가
+      // 스트림 생성 시 구독 추가
       mySession.on("streamCreated", (event) => {
         const subscriber = mySession.subscribe(event.stream, undefined);
         const connectionData = JSON.parse(
           event.stream.connection.data
         ).clientData;
 
-        // 팬인 경우 크리에이터의 스트림만 구독하도록 함
+        // 팬인 경우 크리에이터의 스트림만 구독
         if (!isCreator && connectionData !== "creator") {
           return;
         }
@@ -62,10 +66,12 @@ export default function App() {
         setSubscribers((subscribers) => [...subscribers, subscriber]);
       });
 
+      // 스트림 종료 시 구독 삭제
       mySession.on("streamDestroyed", (event) => {
         deleteSubscriber(event.stream.streamManager);
       });
 
+      // 예외 발생 시 경고 로그 출력
       mySession.on("exception", (exception) => {
         console.warn(exception);
       });
@@ -75,9 +81,9 @@ export default function App() {
     [isCreator]
   );
 
+  // 세션이 설정되면 토큰을 가져와서 연결
   useEffect(() => {
     if (session) {
-      // Get a token from the OpenVidu deployment
       getToken().then(async (token) => {
         try {
           await session.connect(token, {
@@ -113,23 +119,18 @@ export default function App() {
           setPublisher(publisher);
           setCurrentVideoDevice(currentVideoDevice);
         } catch (error) {
-          console.log(
-            "There was an error connecting to the session:",
-            error.code,
-            error.message
-          );
+          console.log("세션 연결시 에러 발생:", error.code, error.message);
         }
       });
     }
   }, [session, isCreator]);
 
+  // 세션을 떠나는 함수
   const leaveSession = useCallback(() => {
-    // 세션을 떠남
     if (session) {
       session.disconnect();
     }
 
-    // 모든 상태와 OpenVidu 객체를 초기화
     OV.current = new OpenVidu();
     setSession(undefined);
     setSubscribers([]);
@@ -139,6 +140,7 @@ export default function App() {
     setPublisher(undefined);
   }, [session]);
 
+  // 카메라 장치 변경 함수
   const switchCamera = useCallback(async () => {
     try {
       const devices = await OV.current.getDevices();
@@ -173,6 +175,7 @@ export default function App() {
     }
   }, [currentVideoDevice, session, mainStreamManager, isCreator]);
 
+  // 구독자 삭제 함수
   const deleteSubscriber = useCallback((streamManager) => {
     setSubscribers((prevSubscribers) => {
       const index = prevSubscribers.indexOf(streamManager);
@@ -186,28 +189,28 @@ export default function App() {
     });
   }, []);
 
-  // 본인 오디오 트랙 토글
+  // 본인 오디오 토글 함수
   const toggleMyAudio = useCallback(() => {
     if (publisher) {
       publisher.publishAudio(!publisher.stream.audioActive);
     }
   }, [publisher]);
 
-  // 본인 비디오 트랙 토글
+  // 본인 비디오 토글 함수
   const toggleMyVideo = useCallback(() => {
     if (publisher) {
       publisher.publishVideo(!publisher.stream.videoActive);
     }
   }, [publisher]);
 
-  // 팬의 오디오 트랙 토글
+  // 팬의 오디오 트랙 토글 함수
   const toggleFanAudio = (audioTracks) => {
     const stateOfAudio = !audioTracks[0].enabled;
     audioTracks[0].enabled = stateOfAudio;
     return stateOfAudio;
   };
 
-  // 팬의 비디오 트랙 토글
+  // 팬의 비디오 트랙 토글 함수
   const toggleFanVideo = (videoTracks) => {
     const stateOfVideo = !videoTracks[0].enabled;
     videoTracks[0].enabled = stateOfVideo;
@@ -278,12 +281,10 @@ export default function App() {
     }
   };
 
-  // 특정 팬의 오디오 제어
+  // 특정 팬의 오디오 제어 함수
   const controlFansAudio = useCallback(
     (subscriber) => {
-      // 참여자 존재 + 그 안에 비디오 속성이 배열인 경우만 실행
       if (subscriber && Array.isArray(subscriber.videos)) {
-        // 각 비디오에 대해 반복문 실행
         subscriber.videos.forEach((videoObj) => {
           sendAudioToggleSignal(videoObj, subscriber, session);
         });
@@ -294,12 +295,10 @@ export default function App() {
     [session]
   );
 
-  // 특정 팬의 비디오를 제어하는 함수
+  // 특정 팬의 비디오 제어 함수
   const controlFansVideo = useCallback(
     (subscriber) => {
-      // subscriber가 존재하고 비디오 속성이 배열인 경우만 실행
       if (subscriber && Array.isArray(subscriber.videos)) {
-        // 각 비디오에 대해 반복문 실행
         subscriber.videos.forEach((videoObj) => {
           sendVideoToggleSignal(videoObj, subscriber, session);
         });
@@ -335,6 +334,7 @@ export default function App() {
     }
   }, [session, updateStateWithSignal]);
 
+  // 페이지를 떠나기 전 세션을 떠나는 이벤트 핸들러 등록
   useEffect(() => {
     const handleBeforeUnload = (event) => {
       leaveSession();
@@ -346,12 +346,14 @@ export default function App() {
     };
   }, [leaveSession]);
 
+  // 세션 토큰 가져오기
   const getToken = useCallback(async () => {
     return createSession(mySessionId).then((sessionId) =>
       createToken(sessionId)
     );
   }, [mySessionId]);
 
+  // 세션 생성 함수
   const createSession = async (sessionId) => {
     const response = await axios.post(
       APPLICATION_SERVER_URL + "api/sessions",
@@ -360,9 +362,10 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
       }
     );
-    return response.data; // The sessionId
+    return response.data; // 세션 ID 반환
   };
 
+  // 세션 토큰 생성 함수
   const createToken = async (sessionId) => {
     const response = await axios.post(
       APPLICATION_SERVER_URL + "api/sessions/" + sessionId + "/connections",
