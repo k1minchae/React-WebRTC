@@ -51,16 +51,7 @@ export default function App() {
       // 스트림 생성 시 구독 추가
       mySession.on("streamCreated", (event) => {
         const subscriber = mySession.subscribe(event.stream, undefined);
-        const connectionData = JSON.parse(
-          event.stream.connection.data
-        ).clientData;
-
         setSubscribers((subscribers) => [...subscribers, subscriber]);
-
-        // 크리에이터인 경우 모든 구독자를 보이도록 설정
-        if (isCreator) {
-          setVisibleSubscribers((prev) => [...prev, subscriber]);
-        }
       });
 
       // 스트림 종료 시 구독 삭제
@@ -533,67 +524,53 @@ export default function App() {
           </div>
 
           <div id="video-container" className="col-md-12">
+            <div className="stream-container col-md-12">
+              <h2>크리에이터</h2>
+              <UserVideoComponent streamManager={publisher} />
+            </div>
             {!isCreator && (
-              <>
-                <div className="stream-container col-md-8">
-                  <h2>크리에이터</h2>
-                  {subscribers.map((sub, i) => {
-                    const connectionData = JSON.parse(
-                      sub.stream.connection.data
-                    ).clientData;
-                    if (
-                      connectionData === "creator" ||
-                      visibleSubscribers.includes(sub)
-                    ) {
-                      return (
-                        <div key={sub.id} className="stream-wrapper">
-                          <UserVideoComponent streamManager={sub} />
-                          <span>{connectionData}</span>
+              <div className="stream-container col-md-12">
+                <h3>내 화면</h3>
+                <UserVideoComponent streamManager={publisher} />
+              </div>
+            )}
+            <div className="col-md-12">
+              {subscribers.map((sub, i) => {
+                const connectionData = JSON.parse(
+                  sub.stream.connection.data
+                ).clientData;
+                if (isCreator || visibleSubscribers.includes(sub)) {
+                  return (
+                    <div
+                      key={sub.id}
+                      className="stream-container col-md-6 col-xs-6"
+                      onClick={() => handleMainVideoStream(sub)}
+                    >
+                      <div className="stream-wrapper">
+                        <UserVideoComponent streamManager={sub} />
+                        <span>{connectionData}</span>
+                      </div>
+                      {isCreator && (
+                        <div>
+                          <button onClick={() => controlFansAudio(sub)}>
+                            Mute/Unmute
+                          </button>
+                          <button onClick={() => controlFansVideo(sub)}>
+                            Enable/Disable Video
+                          </button>
+                          <button onClick={() => toggleFanVisibility(sub)}>
+                            {visibleSubscribers.includes(sub)
+                              ? "Hide from All"
+                              : "Show to All"}
+                          </button>
                         </div>
-                      );
-                    }
-                    return null;
-                  })}
-                </div>
-                <div className="stream-container col-md-4">
-                  <h3>내 화면</h3>
-                  <UserVideoComponent streamManager={publisher} />
-                </div>
-              </>
-            )}
-            {isCreator && (
-              <>
-                <div className="stream-container col-md-6 col-xs-6">
-                  <h3>내 화면</h3>
-                  <UserVideoComponent streamManager={publisher} />
-                </div>
-                {subscribers.map((sub, i) => (
-                  <div
-                    key={sub.id}
-                    className="stream-container col-md-6 col-xs-6"
-                    onClick={() => handleMainVideoStream(sub)}
-                  >
-                    <div className="stream-wrapper">
-                      <UserVideoComponent streamManager={sub} />
-                      <span>
-                        {JSON.parse(sub.stream.connection.data).clientData}
-                      </span>
+                      )}
                     </div>
-                    <button onClick={() => controlFansAudio(sub)}>
-                      Mute/Unmute
-                    </button>
-                    <button onClick={() => controlFansVideo(sub)}>
-                      Enable/Disable Video
-                    </button>
-                    <button onClick={() => toggleFanVisibility(sub)}>
-                      {visibleSubscribers.includes(sub)
-                        ? "Hide from All"
-                        : "Show to All"}
-                    </button>
-                  </div>
-                ))}
-              </>
-            )}
+                  );
+                }
+                return null;
+              })}
+            </div>
           </div>
         </div>
       ) : null}
